@@ -117,7 +117,7 @@ export const taskDB = {
 
   async deleteTask(id: number): Promise<boolean> {
     const { rowCount } = await sql`DELETE FROM tasks WHERE id = ${id}`;
-    return rowCount > 0;
+    return (rowCount ?? 0) > 0;
   },
 
   async hasChildren(id: number): Promise<boolean> {
