@@ -1,0 +1,104 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { AppSidebar } from "@/components/app-sidebar"
+import { SiteHeader } from "@/components/site-header"
+import {
+  SidebarInset,
+  SidebarProvider,
+} from "@/components/ui/sidebar"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { TaskTable } from "@/components/task-table"
+import { Task } from "@/lib/types"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner"
+
+export default function Page() {
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const fetchTasks = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/tasks')
+      if (!response.ok) throw new Error('Failed to fetch tasks')
+      const data = await response.json()
+      setTasks(data)
+    } catch (error) {
+      console.error('Error fetching tasks:', error)
+      toast.error('Failed to load tasks')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchTasks()
+  }, [])
+
+  return (
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "calc(var(--spacing) * 72)",
+          "--header-height": "calc(var(--spacing) * 12)",
+        } as React.CSSProperties
+      }
+    >
+      <AppSidebar variant="inset" />
+      <SidebarInset>
+        <SiteHeader />
+        <div className="flex flex-1 flex-col">
+          <div className="@container/main flex flex-1 flex-col gap-2">
+            <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>Task List</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>All Tasks</CardTitle>
+                  <CardDescription>
+                    View and manage all tasks in the system. You can filter, sort, and export tasks.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="space-y-4">
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-[400px] w-full" />
+                    </div>
+                  ) : (
+                    <TaskTable 
+                      tasks={tasks} 
+                      onTaskDeleted={() => {
+                        toast.success('Task deleted successfully')
+                        fetchTasks()
+                      }}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  )
+}
