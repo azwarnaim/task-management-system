@@ -159,18 +159,19 @@ export function propagateStatusChange(
   updates.push({ id: taskId, status: newStatus });
 
   // Case 1: Task marked as DONE - check if it should auto-upgrade to COMPLETE
-  // DONE applies to a single task, while COMPLETE reflects the status of all dependencies.
-  // If a task marked DONE has no dependencies, it becomes COMPLETE automatically.
+  // Only upgrade to COMPLETE when all children (dependencies) are COMPLETE
   if (newStatus === 'DONE') {
     const children = getTaskChildren(tasks, taskId);
-    if (children.length === 0) {
-      // No dependencies - auto-upgrade to COMPLETE
-      updates[0].status = 'COMPLETE';
-      newStatus = 'COMPLETE'; // Update for next check
-    } else if (children.every(child => child.status === 'COMPLETE')) {
+    if (children.length > 0 && children.every(child => child.status === 'COMPLETE')) {
       // Has dependencies and all are COMPLETE - auto-upgrade to COMPLETE
       updates[0].status = 'COMPLETE';
       newStatus = 'COMPLETE'; // Update for next check
+    }
+    
+    // Also notify parent that this child is now DONE
+    // Parent should check if all children are DONE/COMPLETE and upgrade to COMPLETE
+    if (currentTask.parentId) {
+      propagateUpwardsComplete(tasks, currentTask.parentId, updates);
     }
   }
 
@@ -190,7 +191,7 @@ export function propagateStatusChange(
 
 /**
  * Helper function to propagate COMPLETE status upwards
- * Checks if parent can become COMPLETE when all children are COMPLETE
+ * Checks if parent can become COMPLETE when all children are DONE or COMPLETE
  */
 function propagateUpwardsComplete(
   tasks: Task[],
@@ -213,13 +214,28 @@ function propagateUpwardsComplete(
   const children = getTaskChildren(tasks, parentId);
   if (children.length === 0) return; // No children, can't auto-upgrade
 
-  const allChildrenComplete = children.every(child => {
+  // Check if all children are DONE or COMPLETE
+  const allChildrenDoneOrComplete = children.every(child => {
     const status = updatedStatuses.get(child.id) || child.status;
-    return status === 'COMPLETE';
+    return status === 'DONE' || status === 'COMPLETE';
   });
 
-  if (allChildrenComplete) {
-    // When all children are COMPLETE, parent should be marked as COMPLETE
+  if (allChildrenDoneOrComplete) {
+    // Upgrade all DONE children to COMPLETE
+    children.forEach(child => {
+      const childStatus = updatedStatuses.get(child.id) || child.status;
+      if (childStatus === 'DONE') {
+        const existingChildUpdate = updates.find(u => u.id === child.id);
+        if (existingChildUpdate) {
+          existingChildUpdate.status = 'COMPLETE';
+        } else {
+          updates.push({ id: child.id, status: 'COMPLETE' });
+        }
+        updatedStatuses.set(child.id, 'COMPLETE');
+      }
+    });
+
+    // When all children are DONE or COMPLETE, parent should be marked as COMPLETE
     // regardless of its current status (IN PROGRESS, DONE, etc.)
     if (existingParentUpdate) {
       existingParentUpdate.status = 'COMPLETE';
@@ -236,6 +252,8 @@ function propagateUpwardsComplete(
 
 /**
  * Helper function to propagate DONE status upwards (from COMPLETE to DONE)
+ * When a child task is changed to IN PROGRESS, update parent from COMPLETE to DONE
+ * Parent task must never revert to IN PROGRESS
  */
 function propagateUpwardsDone(
   tasks: Task[],
@@ -248,10 +266,14 @@ function propagateUpwardsDone(
   const parent = taskMap.get(parentId);
   if (!parent) return;
 
-  if (parent.status === 'COMPLETE') {
-    const existingUpdate = updates.find(u => u.id === parentId);
-    if (existingUpdate) {
-      existingUpdate.status = 'DONE';
+  // Get current parent status (considering pending updates)
+  const existingParentUpdate = updates.find(u => u.id === parentId);
+  const currentParentStatus = existingParentUpdate?.status || parent.status;
+
+  // Only downgrade from COMPLETE to DONE, never to IN PROGRESS
+  if (currentParentStatus === 'COMPLETE') {
+    if (existingParentUpdate) {
+      existingParentUpdate.status = 'DONE';
     } else {
       updates.push({ id: parentId, status: 'DONE' });
     }
