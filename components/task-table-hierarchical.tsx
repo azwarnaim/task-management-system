@@ -68,7 +68,7 @@ function TaskRow({
     setIsEditing(false)
   }
 
-  // Get available parent options (exclude self and descendants)
+  // Get available parent options (exclude self, descendants, and COMPLETE tasks)
   const getAvailableParents = () => {
     const getDescendants = (taskId: number): number[] => {
       const children = getTaskChildren(allTasks, taskId)
@@ -76,7 +76,7 @@ function TaskRow({
     }
     
     const excludedIds = new Set([task.id, ...getDescendants(task.id)])
-    return allTasks.filter(t => !excludedIds.has(t.id))
+    return allTasks.filter(t => !excludedIds.has(t.id) && t.status !== 'COMPLETE')
   }
 
   const statusColors: Record<string, string> = {
@@ -340,20 +340,38 @@ export function TaskTableHierarchical({ tasks, onTasksChanged }: TaskTableHierar
 
       if (!response.ok) throw new Error('Failed to update task')
 
-      // If parent changed, may need status propagation
+      // If parent changed, need to check status propagation on both old and new parent chains
       if (updates.parentId !== undefined && updates.parentId !== task.parentId) {
-        // Trigger propagation if needed
-        const statusUpdates = propagateStatusChange(tasks, taskId, task.status)
-        for (const update of statusUpdates) {
-          if (update.id === taskId) continue // Already updated
+        const statusUpdatesToApply = new Map<number, string>()
+        
+        // Create updated tasks array with the new parent relationship
+        const updatedTasks = tasks.map(t => 
+          t.id === taskId ? { ...t, ...updates } : t
+        )
+
+        // Check old parent chain (if exists) - parent may need status downgrade
+        if (task.parentId) {
+          const oldParentUpdates = propagateStatusChange(updatedTasks, task.parentId, tasks.find(t => t.id === task.parentId)?.status || 'IN PROGRESS')
+          oldParentUpdates.forEach(u => statusUpdatesToApply.set(u.id, u.status))
+        }
+
+        // Check new parent chain (if exists) - new parent may need status upgrade
+        if (updates.parentId) {
+          const newParentUpdates = propagateStatusChange(updatedTasks, updates.parentId, tasks.find(t => t.id === updates.parentId)?.status || 'IN PROGRESS')
+          newParentUpdates.forEach(u => statusUpdatesToApply.set(u.id, u.status))
+        }
+
+        // Apply all status updates
+        for (const [id, status] of statusUpdatesToApply) {
+          if (id === taskId) continue // Already updated
           
-          const taskToUpdate = tasks.find(t => t.id === update.id)
+          const taskToUpdate = tasks.find(t => t.id === id)
           if (!taskToUpdate) continue
 
-          await fetch(`/api/tasks/${update.id}`, {
+          await fetch(`/api/tasks/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...taskToUpdate, status: update.status })
+            body: JSON.stringify({ ...taskToUpdate, status })
           })
         }
       }

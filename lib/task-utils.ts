@@ -159,10 +159,16 @@ export function propagateStatusChange(
   updates.push({ id: taskId, status: newStatus });
 
   // Case 1: Task marked as DONE - check if it should auto-upgrade to COMPLETE
+  // DONE applies to a single task, while COMPLETE reflects the status of all dependencies.
+  // If a task marked DONE has no dependencies, it becomes COMPLETE automatically.
   if (newStatus === 'DONE') {
     const children = getTaskChildren(tasks, taskId);
-    if (children.length > 0 && children.every(child => child.status === 'COMPLETE')) {
-      // Auto-upgrade to COMPLETE
+    if (children.length === 0) {
+      // No dependencies - auto-upgrade to COMPLETE
+      updates[0].status = 'COMPLETE';
+      newStatus = 'COMPLETE'; // Update for next check
+    } else if (children.every(child => child.status === 'COMPLETE')) {
+      // Has dependencies and all are COMPLETE - auto-upgrade to COMPLETE
       updates[0].status = 'COMPLETE';
       newStatus = 'COMPLETE'; // Update for next check
     }
@@ -201,9 +207,6 @@ function propagateUpwardsComplete(
   const existingParentUpdate = updates.find(u => u.id === parentId);
   const currentParentStatus = existingParentUpdate?.status || parent.status;
 
-  // Only upgrade if parent is DONE (not IN PROGRESS)
-  if (currentParentStatus !== 'DONE') return;
-
   // Apply pending updates to check current state of children
   const updatedStatuses = new Map(updates.map(u => [u.id, u.status]));
   
@@ -216,6 +219,8 @@ function propagateUpwardsComplete(
   });
 
   if (allChildrenComplete) {
+    // When all children are COMPLETE, parent should be marked as COMPLETE
+    // regardless of its current status (IN PROGRESS, DONE, etc.)
     if (existingParentUpdate) {
       existingParentUpdate.status = 'COMPLETE';
     } else {

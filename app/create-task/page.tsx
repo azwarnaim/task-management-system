@@ -112,7 +112,9 @@ export default function Page() {
   }
 
   const invalidParentIds = getInvalidParentIds(tasks, null)
-  const availableParentTasks = tasks.filter(task => !invalidParentIds.includes(task.id))
+  const availableParentTasks = tasks.filter(task => 
+    !invalidParentIds.includes(task.id) && task.status !== 'COMPLETE'
+  )
 
   return (
     <SidebarProvider
