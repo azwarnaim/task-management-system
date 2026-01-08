@@ -159,16 +159,27 @@ export function propagateStatusChange(
   updates.push({ id: taskId, status: newStatus });
 
   // Case 1: Task marked as DONE - check if it should auto-upgrade to COMPLETE
-  // Only upgrade to COMPLETE when all children (dependencies) are COMPLETE
+  // Root tasks with no children automatically become COMPLETE
+  // Child tasks stay DONE and wait for parent to complete all siblings
+  // Parent tasks upgrade to COMPLETE when all children are DONE/COMPLETE
   if (newStatus === 'DONE') {
     const children = getTaskChildren(tasks, taskId);
-    if (children.length > 0 && children.every(child => child.status === 'COMPLETE')) {
-      // Has dependencies and all are COMPLETE - auto-upgrade to COMPLETE
-      updates[0].status = 'COMPLETE';
-      newStatus = 'COMPLETE'; // Update for next check
-    }
     
-    // Also notify parent that this child is now DONE
+    // Only auto-upgrade to COMPLETE if:
+    // 1. Task has no parent (root task) AND no children, OR
+    // 2. Task has children and all are DONE/COMPLETE
+    if (!currentTask.parentId && children.length === 0) {
+      // Root task with no children - auto-upgrade to COMPLETE
+      updates[0].status = 'COMPLETE';
+      newStatus = 'COMPLETE';
+    } else if (children.length > 0 && children.every(child => child.status === 'DONE' || child.status === 'COMPLETE')) {
+      // Has children and all are DONE/COMPLETE - auto-upgrade to COMPLETE
+      updates[0].status = 'COMPLETE';
+      newStatus = 'COMPLETE';
+    }
+    // else: child task with parent - stays DONE, waits for parent to complete
+    
+    // Notify parent that this child is now DONE/COMPLETE
     // Parent should check if all children are DONE/COMPLETE and upgrade to COMPLETE
     if (currentTask.parentId) {
       propagateUpwardsComplete(tasks, currentTask.parentId, updates);
