@@ -18,7 +18,7 @@ export async function GET(
       );
     }
 
-    const task = taskDB.getTaskById(id);
+    const task = await taskDB.getTaskById(id);
     
     if (!task) {
       return NextResponse.json(
@@ -57,7 +57,7 @@ export async function PUT(
     const { header, type, status, target, limit, reviewer, parentId } = body;
 
     // Check if task exists
-    const existingTask = taskDB.getTaskById(id);
+    const existingTask = await taskDB.getTaskById(id);
     if (!existingTask) {
       return NextResponse.json(
         { error: 'Task not found' },
@@ -67,7 +67,7 @@ export async function PUT(
 
     // Check for circular dependency if parent is being changed
     if (parentId !== undefined && parentId !== existingTask.parentId) {
-      const allTasks = taskDB.getAllTasks();
+      const allTasks = await taskDB.getAllTasks();
       
       if (wouldCreateCircularDependency(allTasks, id, parentId)) {
         return NextResponse.json(
@@ -78,7 +78,7 @@ export async function PUT(
 
       // Verify parent task exists if parentId is provided
       if (parentId !== null) {
-        const parentTask = taskDB.getTaskById(parentId);
+        const parentTask = await taskDB.getTaskById(parentId);
         if (!parentTask) {
           return NextResponse.json(
             { error: 'Parent task not found' },
@@ -88,7 +88,7 @@ export async function PUT(
       }
     }
 
-    const updatedTask = taskDB.updateTask(id, {
+    const updatedTask = await taskDB.updateTask(id, {
       header,
       type,
       status,
@@ -125,14 +125,14 @@ export async function DELETE(
     }
 
     // Check if task has children
-    if (taskDB.hasChildren(id)) {
+    if (await taskDB.hasChildren(id)) {
       return NextResponse.json(
         { error: 'Cannot delete task with child tasks. Delete or reassign children first.' },
         { status: 400 }
       );
     }
 
-    const deleted = taskDB.deleteTask(id);
+    const deleted = await taskDB.deleteTask(id);
     
     if (!deleted) {
       return NextResponse.json(

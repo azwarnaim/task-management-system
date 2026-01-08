@@ -1,0 +1,38 @@
+[00:00:00.834] Server  LOG     ✓ Ready in 698ms
+[00:00:03.839] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:01:53.459] Server  LOG     ✓ Compiled in 46ms
+[00:02:08.103] Server  LOG     ✓ Compiled in 117ms
+[00:02:08.637] Browser ERROR   uncaughtError: ReferenceError: Select is not defined
+[00:02:23.093] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:02:23.232] Server  LOG     ✓ Compiled in 147ms
+[00:02:23.404] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:02:23.653] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:02:23.752] Server  LOG     ✓ Compiled in 4ms
+[00:05:10.337] Server  LOG     ✓ Compiled in 54ms
+[00:05:26.088] Server  LOG     ✓ Compiled in 30ms
+[00:05:26.638] Browser ERROR   uncaughtError: ReferenceError: TaskTable is not defined
+[00:05:34.978] Server  LOG     ✓ Compiled in 86ms
+[00:05:34.981] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:05:35.358] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:05:43.802] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:12:00.974] Server  LOG     ✓ Compiled in 26ms
+[00:12:16.353] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:12:47.776] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:15:10.126] Server  LOG     ✓ Compiled in 33ms
+[00:16:17.145] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:18:19.211] Server  LOG     ✓ Compiled in 27ms
+[00:18:29.612] Server  LOG     ✓ Compiled in 20ms
+[00:18:38.063] Server  LOG     ✓ Compiled in 77ms
+[00:18:45.001] Server  LOG     ✓ Compiled in 18ms
+[00:18:56.704] Server  LOG     ✓ Compiled in 40ms
+[00:19:05.459] Server  LOG     ✓ Compiled in 35ms
+[00:19:56.515] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:21:11.646] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:21:31.989] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:21:39.919] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:22:51.523] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:26:19.685] Browser ERROR   Error deleting task: {}
+[00:26:30.353] Browser ERROR   Error deleting task: {}
+[00:26:50.783] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:28:34.648] Server  LOG     ✓ Compiled in 51ms
+[00:33:19.835] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

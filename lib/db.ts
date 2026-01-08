@@ -1,219 +1,87 @@
-import Database from 'better-sqlite3';
-import path from 'path';
 import { Task } from './types';
 
-const dbPath = path.join(process.cwd(), 'database', 'tasks.db');
-const db = new Database(dbPath);
+// Simple wrapper that switches between SQLite and Vercel Postgres
+const isProduction = typeof process !== 'undefined' && (process.env.VERCEL === '1' || process.env.POSTGRES_URL);
 
-// Enable foreign keys
-db.pragma('foreign_keys = ON');
-
-// Initialize database schema
-export function initializeDatabase() {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS tasks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      header TEXT NOT NULL,
-      type TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'In Process',
-      target TEXT NOT NULL DEFAULT '0',
-      limit_value TEXT NOT NULL DEFAULT '0',
-      reviewer TEXT NOT NULL DEFAULT 'Assign reviewer',
-      parent_id INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE SET NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_parent_id ON tasks(parent_id);
-    CREATE INDEX IF NOT EXISTS idx_status ON tasks(status);
-  `);
+// Create async wrappers for all database operations
+export async function initializeDatabase() {
+  if (isProduction) {
+    const { initializeDatabase: init } = await import('./db-vercel');
+    return init();
+  } else {
+    const { initializeDatabase: init } = await import('./db-sqlite');
+    return init();
+  }
 }
 
-// Task CRUD operations
 export const taskDB = {
-  // Get all tasks
-  getAllTasks(): Task[] {
-    const stmt = db.prepare(`
-      SELECT 
-        id,
-        header,
-        type,
-        status,
-        target,
-        limit_value as "limit",
-        reviewer,
-        parent_id as parentId
-      FROM tasks
-      ORDER BY id ASC
-    `);
-    return stmt.all() as Task[];
-  },
-
-  // Get task by ID
-  getTaskById(id: number): Task | null {
-    const stmt = db.prepare(`
-      SELECT 
-        id,
-        header,
-        type,
-        status,
-        target,
-        limit_value as "limit",
-        reviewer,
-        parent_id as parentId
-      FROM tasks
-      WHERE id = ?
-    `);
-    return stmt.get(id) as Task | null;
-  },
-
-  // Get tasks by parent ID
-  getTasksByParentId(parentId: number | null): Task[] {
-    if (parentId === null) {
-      const stmt = db.prepare(`
-        SELECT 
-          id,
-          header,
-          type,
-          status,
-          target,
-          limit_value as "limit",
-          reviewer,
-          parent_id as parentId
-        FROM tasks
-        WHERE parent_id IS NULL
-        ORDER BY id ASC
-      `);
-      return stmt.all() as Task[];
+  async getAllTasks(): Promise<Task[]> {
+    if (isProduction) {
+      const { taskDB } = await import('./db-vercel');
+      return taskDB.getAllTasks();
     } else {
-      const stmt = db.prepare(`
-        SELECT 
-          id,
-          header,
-          type,
-          status,
-          target,
-          limit_value as "limit",
-          reviewer,
-          parent_id as parentId
-        FROM tasks
-        WHERE parent_id = ?
-        ORDER BY id ASC
-      `);
-      return stmt.all(parentId) as Task[];
+      const { taskDB } = await import('./db-sqlite');
+      return taskDB.getAllTasks();
     }
   },
 
-  // Create new task
-  createTask(task: Omit<Task, 'id'>): Task {
-    const stmt = db.prepare(`
-      INSERT INTO tasks (header, type, status, target, limit_value, reviewer, parent_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    
-    const info = stmt.run(
-      task.header,
-      task.type,
-      task.status,
-      task.target,
-      task.limit,
-      task.reviewer,
-      task.parentId ?? null
-    );
-
-    return this.getTaskById(info.lastInsertRowid as number)!;
+  async getTaskById(id: number): Promise<Task | null> {
+    if (isProduction) {
+      const { taskDB } = await import('./db-vercel');
+      return taskDB.getTaskById(id);
+    } else {
+      const { taskDB } = await import('./db-sqlite');
+      return taskDB.getTaskById(id);
+    }
   },
 
-  // Update task
-  updateTask(id: number, task: Partial<Omit<Task, 'id'>>): Task | null {
-    const fields: string[] = [];
-    const values: any[] = [];
-
-    if (task.header !== undefined) {
-      fields.push('header = ?');
-      values.push(task.header);
+  async getTasksByParentId(parentId: number | null): Promise<Task[]> {
+    if (isProduction) {
+      const { taskDB } = await import('./db-vercel');
+      return taskDB.getTasksByParentId(parentId);
+    } else {
+      const { taskDB } = await import('./db-sqlite');
+      return taskDB.getTasksByParentId(parentId);
     }
-    if (task.type !== undefined) {
-      fields.push('type = ?');
-      values.push(task.type);
-    }
-    if (task.status !== undefined) {
-      fields.push('status = ?');
-      values.push(task.status);
-    }
-    if (task.target !== undefined) {
-      fields.push('target = ?');
-      values.push(task.target);
-    }
-    if (task.limit !== undefined) {
-      fields.push('limit_value = ?');
-      values.push(task.limit);
-    }
-    if (task.reviewer !== undefined) {
-      fields.push('reviewer = ?');
-      values.push(task.reviewer);
-    }
-    if (task.parentId !== undefined) {
-      fields.push('parent_id = ?');
-      values.push(task.parentId ?? null);
-    }
-
-    if (fields.length === 0) {
-      return this.getTaskById(id);
-    }
-
-    fields.push('updated_at = CURRENT_TIMESTAMP');
-    values.push(id);
-
-    const stmt = db.prepare(`
-      UPDATE tasks
-      SET ${fields.join(', ')}
-      WHERE id = ?
-    `);
-
-    stmt.run(...values);
-    return this.getTaskById(id);
   },
 
-  // Delete task
-  deleteTask(id: number): boolean {
-    const stmt = db.prepare('DELETE FROM tasks WHERE id = ?');
-    const info = stmt.run(id);
-    return info.changes > 0;
+  async createTask(task: Omit<Task, 'id'>): Promise<Task> {
+    if (isProduction) {
+      const { taskDB } = await import('./db-vercel');
+      return taskDB.createTask(task);
+    } else {
+      const { taskDB } = await import('./db-sqlite');
+      return taskDB.createTask(task);
+    }
   },
 
-  // Check if task has children
-  hasChildren(id: number): boolean {
-    const stmt = db.prepare('SELECT COUNT(*) as count FROM tasks WHERE parent_id = ?');
-    const result = stmt.get(id) as { count: number };
-    return result.count > 0;
+  async updateTask(id: number, task: Partial<Omit<Task, 'id'>>): Promise<Task | null> {
+    if (isProduction) {
+      const { taskDB } = await import('./db-vercel');
+      return taskDB.updateTask(id, task);
+    } else {
+      const { taskDB } = await import('./db-sqlite');
+      return taskDB.updateTask(id, task);
+    }
   },
 
-  // Bulk insert tasks (for migration)
-  bulkInsertTasks(tasks: Array<Omit<Task, 'id'> & { id?: number }>): void {
-    const stmt = db.prepare(`
-      INSERT INTO tasks (id, header, type, status, target, limit_value, reviewer, parent_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+  async deleteTask(id: number): Promise<boolean> {
+    if (isProduction) {
+      const { taskDB } = await import('./db-vercel');
+      return taskDB.deleteTask(id);
+    } else {
+      const { taskDB } = await import('./db-sqlite');
+      return taskDB.deleteTask(id);
+    }
+  },
 
-    const insertMany = db.transaction((tasks) => {
-      for (const task of tasks) {
-        stmt.run(
-          task.id ?? null,
-          task.header,
-          task.type,
-          task.status,
-          task.target,
-          task.limit,
-          task.reviewer,
-          task.parentId ?? null
-        );
-      }
-    });
-
-    insertMany(tasks);
+  async hasChildren(id: number): Promise<boolean> {
+    if (isProduction) {
+      const { taskDB } = await import('./db-vercel');
+      return taskDB.hasChildren(id);
+    } else {
+      const { taskDB } = await import('./db-sqlite');
+      return taskDB.hasChildren(id);
+    }
   },
 };
-
-export default db;

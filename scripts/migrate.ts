@@ -14,10 +14,10 @@ async function migrate() {
   try {
     // Initialize database
     console.log('📊 Initializing database schema...');
-    initializeDatabase();
+    await initializeDatabase();
     
     // Check if data already exists
-    const existingTasks = taskDB.getAllTasks();
+    const existingTasks = await taskDB.getAllTasks();
     if (existingTasks.length > 0) {
       console.log(`⚠️  Database already contains ${existingTasks.length} tasks.`);
       console.log('Do you want to continue? This will keep existing data.');
@@ -39,12 +39,14 @@ async function migrate() {
       parentId: undefined as number | undefined,
     }));
     
-    // Insert tasks in bulk
+    // Insert tasks one by one (bulkInsert only available in SQLite mode)
     console.log(`📝 Inserting ${tasksToInsert.length} tasks...`);
-    taskDB.bulkInsertTasks(tasksToInsert);
+    for (const task of tasksToInsert) {
+      await taskDB.createTask(task);
+    }
     
     // Verify
-    const insertedTasks = taskDB.getAllTasks();
+    const insertedTasks = await taskDB.getAllTasks();
     console.log(`✅ Successfully migrated ${insertedTasks.length} tasks!`);
     
     // Show some stats

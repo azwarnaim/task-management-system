@@ -8,7 +8,7 @@ initializeDatabase();
 // GET /api/tasks - Get all tasks
 export async function GET() {
   try {
-    const tasks = taskDB.getAllTasks();
+    const tasks = await taskDB.getAllTasks();
     return NextResponse.json(tasks);
   } catch (error) {
     console.error('Error fetching tasks:', error);
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     // Check for circular dependency if parent is specified
     if (parentId) {
-      const allTasks = taskDB.getAllTasks();
+      const allTasks = await taskDB.getAllTasks();
       // For new tasks, we'll use a temporary high ID
       const tempId = Math.max(...allTasks.map(t => t.id), 0) + 1;
       
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Verify parent task exists
-      const parentTask = taskDB.getTaskById(parentId);
+      const parentTask = await taskDB.getTaskById(parentId);
       if (!parentTask) {
         return NextResponse.json(
           { error: 'Parent task not found' },
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const newTask = taskDB.createTask({
+    const newTask = await taskDB.createTask({
       header: header.trim(),
       type: type || 'Narrative',
       status: status || 'In Process',
