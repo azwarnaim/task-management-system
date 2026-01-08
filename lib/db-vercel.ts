@@ -196,11 +196,13 @@ export const taskDB = {
     const rootTaskIds = rootTasksResult.rows.map(r => r.id);
 
     // Get all descendants recursively using CTE
-    const tasksResult = await sql`
+    // Build the IN clause dynamically
+    const idPlaceholders = rootTaskIds.map((_, i) => `$${i + 1}`).join(', ');
+    const tasksResult = await sql.query(`
       WITH RECURSIVE task_tree AS (
         SELECT id, header, type, status, target, limit_value, reviewer, parent_id
         FROM tasks
-        WHERE id = ANY(${rootTaskIds})
+        WHERE id IN (${idPlaceholders})
         
         UNION ALL
         
@@ -219,7 +221,7 @@ export const taskDB = {
         parent_id as "parentId"
       FROM task_tree
       ORDER BY id ASC
-    `;
+    `, rootTaskIds);
 
     return { 
       tasks: tasksResult.rows as Task[], 
