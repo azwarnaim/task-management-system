@@ -30,8 +30,17 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select"
 import { Task } from "@/lib/types"
 import { Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
 const statusColors: Record<string, string> = {
   "Done": "bg-green-500/10 text-green-700 border-green-200",
@@ -39,8 +48,27 @@ const statusColors: Record<string, string> = {
   "Pending": "bg-yellow-500/10 text-yellow-700 border-yellow-200",
 }
 
-export function createColumns(onDelete: (id: number) => void): ColumnDef<Task>[] {
+export function createColumns(
+  onDelete: (id: number) => void,
+  onToggleStatus: (task: Task) => void
+): ColumnDef<Task>[] {
   return [
+  {
+    id: "select",
+    header: "Done",
+    cell: ({ row }) => {
+      const task = row.original
+      return (
+        <Checkbox
+          checked={task.status === 'DONE'}
+          onCheckedChange={() => onToggleStatus(task)}
+          aria-label="Mark as done"
+        />
+      )
+    },
+    enableSorting: false,
+    enableHiding: false,
+  },
   {
     accessorKey: "id",
     header: "ID",
@@ -125,14 +153,16 @@ export function createColumns(onDelete: (id: number) => void): ColumnDef<Task>[]
 interface TaskTableProps {
   tasks: Task[]
   onTaskDeleted?: () => void
+  onTaskUpdated?: () => void
 }
 
-export function TaskTable({ tasks, onTaskDeleted }: TaskTableProps) {
+export function TaskTable({ tasks, onTaskDeleted, onTaskUpdated }: TaskTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
   const [deletingId, setDeletingId] = React.useState<number | null>(null)
+  const [statusFilter, setStatusFilter] = React.useState<string>("ALL")
 
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
@@ -164,10 +194,38 @@ export function TaskTable({ tasks, onTaskDeleted }: TaskTableProps) {
     }
   }
 
-  const columns = React.useMemo(() => createColumns(handleDelete), [])
+  const handleToggleStatus = async (task: Task) => {
+    const newStatus = task.status === 'DONE' ? 'IN PROGRESS' : 'DONE'
+    
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...task, status: newStatus })
+      })
+
+      if (!response.ok) throw new Error('Failed to update task')
+      
+      toast.success(`Task marked as ${newStatus}`)
+      if (onTaskUpdated) {
+        onTaskUpdated()
+      }
+    } catch (error) {
+      console.error('Error updating task:', error)
+      toast.error('Failed to update task status')
+    }
+  }
+
+  const columns = React.useMemo(() => createColumns(handleDelete, handleToggleStatus), [])
+
+  // Filter tasks by status
+  const filteredTasks = React.useMemo(() => {
+    if (statusFilter === "ALL") return tasks
+    return tasks.filter(task => task.status === statusFilter)
+  }, [tasks, statusFilter])
 
   const table = useReactTable({
-    data: tasks,
+    data: filteredTasks,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -188,6 +246,17 @@ export function TaskTable({ tasks, onTaskDeleted }: TaskTableProps) {
   return (
     <div className="w-full space-y-4">
       <div className="flex items-center gap-2">
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Status</SelectItem>
+            <SelectItem value="IN PROGRESS">In Progress</SelectItem>
+            <SelectItem value="DONE">Done</SelectItem>
+            <SelectItem value="COMPLETE">Complete</SelectItem>
+          </SelectContent>
+        </Select>
         <Input
           placeholder="Filter tasks..."
           value={(table.getColumn("header")?.getFilterValue() as string) ?? ""}

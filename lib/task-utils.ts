@@ -96,3 +96,164 @@ export function getInvalidParentIds(tasks: Task[], taskId: number | null): numbe
   const descendants = getTaskDescendants(tasks, taskId);
   return [taskId, ...descendants];
 }
+
+/**
+ * Gets direct children of a task
+ * @param tasks - All tasks in the system
+ * @param taskId - The task ID to get children for
+ * @returns Array of child tasks
+ */
+export function getTaskChildren(tasks: Task[], taskId: number): Task[] {
+  return tasks.filter(task => task.parentId === taskId);
+}
+
+/**
+ * Gets dependency counts for a parent task
+ * @param tasks - All tasks in the system
+ * @param taskId - The parent task ID
+ * @returns Object with total, done, and complete counts
+ */
+export function getDependencyCounts(tasks: Task[], taskId: number) {
+  const children = getTaskChildren(tasks, taskId);
+  return {
+    total: children.length,
+    done: children.filter(t => t.status === 'DONE').length,
+    complete: children.filter(t => t.status === 'COMPLETE').length,
+  };
+}
+
+/**
+ * Checks if all dependencies of a task are COMPLETE
+ * @param tasks - All tasks in the system
+ * @param taskId - The task ID to check
+ * @returns true if all dependencies are COMPLETE
+ */
+export function areAllDependenciesComplete(tasks: Task[], taskId: number): boolean {
+  const children = getTaskChildren(tasks, taskId);
+  if (children.length === 0) return false;
+  return children.every(child => child.status === 'COMPLETE');
+}
+
+/**
+ * Propagates status changes up the hierarchy
+ * When a task becomes DONE and all dependencies are COMPLETE -> mark as COMPLETE
+ * When a task becomes IN PROGRESS -> mark parent as DONE (if COMPLETE)
+ * @param tasks - All tasks in the system
+ * @param taskId - The task that changed
+ * @param newStatus - The new status of the task
+ * @returns Array of tasks that need to be updated with their new statuses
+ */
+export function propagateStatusChange(
+  tasks: Task[],
+  taskId: number,
+  newStatus: string
+): Array<{ id: number; status: string }> {
+  const updates: Array<{ id: number; status: string }> = [];
+  const taskMap = new Map<number, Task>();
+  tasks.forEach(task => taskMap.set(task.id, task));
+
+  const currentTask = taskMap.get(taskId);
+  if (!currentTask) return updates;
+
+  // Update current task
+  updates.push({ id: taskId, status: newStatus });
+
+  // Case 1: Task marked as DONE - check if it should auto-upgrade to COMPLETE
+  if (newStatus === 'DONE') {
+    const children = getTaskChildren(tasks, taskId);
+    if (children.length > 0 && children.every(child => child.status === 'COMPLETE')) {
+      // Auto-upgrade to COMPLETE
+      updates[0].status = 'COMPLETE';
+      newStatus = 'COMPLETE'; // Update for next check
+    }
+  }
+
+  // Case 2: If task is now COMPLETE (either manually or auto-upgraded)
+  // Notify parent to check if it can also become COMPLETE
+  if (newStatus === 'COMPLETE' && currentTask.parentId) {
+    propagateUpwardsComplete(tasks, currentTask.parentId, updates);
+  }
+
+  // Case 3: Task marked as IN PROGRESS - propagate down-grading up the chain
+  if (newStatus === 'IN PROGRESS' && currentTask.parentId) {
+    propagateUpwardsDone(tasks, currentTask.parentId, updates);
+  }
+
+  return updates;
+}
+
+/**
+ * Helper function to propagate COMPLETE status upwards
+ * Checks if parent can become COMPLETE when all children are COMPLETE
+ */
+function propagateUpwardsComplete(
+  tasks: Task[],
+  parentId: number,
+  updates: Array<{ id: number; status: string }>
+): void {
+  const taskMap = new Map<number, Task>();
+  tasks.forEach(task => taskMap.set(task.id, task));
+
+  const parent = taskMap.get(parentId);
+  if (!parent) return;
+
+  // Get current parent status (considering pending updates)
+  const existingParentUpdate = updates.find(u => u.id === parentId);
+  const currentParentStatus = existingParentUpdate?.status || parent.status;
+
+  // Only upgrade if parent is DONE (not IN PROGRESS)
+  if (currentParentStatus !== 'DONE') return;
+
+  // Apply pending updates to check current state of children
+  const updatedStatuses = new Map(updates.map(u => [u.id, u.status]));
+  
+  const children = getTaskChildren(tasks, parentId);
+  if (children.length === 0) return; // No children, can't auto-upgrade
+
+  const allChildrenComplete = children.every(child => {
+    const status = updatedStatuses.get(child.id) || child.status;
+    return status === 'COMPLETE';
+  });
+
+  if (allChildrenComplete) {
+    if (existingParentUpdate) {
+      existingParentUpdate.status = 'COMPLETE';
+    } else {
+      updates.push({ id: parentId, status: 'COMPLETE' });
+    }
+
+    // Continue propagating up
+    if (parent.parentId) {
+      propagateUpwardsComplete(tasks, parent.parentId, updates);
+    }
+  }
+}
+
+/**
+ * Helper function to propagate DONE status upwards (from COMPLETE to DONE)
+ */
+function propagateUpwardsDone(
+  tasks: Task[],
+  parentId: number,
+  updates: Array<{ id: number; status: string }>
+): void {
+  const taskMap = new Map<number, Task>();
+  tasks.forEach(task => taskMap.set(task.id, task));
+
+  const parent = taskMap.get(parentId);
+  if (!parent) return;
+
+  if (parent.status === 'COMPLETE') {
+    const existingUpdate = updates.find(u => u.id === parentId);
+    if (existingUpdate) {
+      existingUpdate.status = 'DONE';
+    } else {
+      updates.push({ id: parentId, status: 'DONE' });
+    }
+
+    // Continue propagating up
+    if (parent.parentId) {
+      propagateUpwardsDone(tasks, parent.parentId, updates);
+    }
+  }
+}

@@ -70,7 +70,7 @@ export default function Page() {
         body: JSON.stringify({
           header: taskName,
           type: "Narrative",
-          status: "In Process",
+          status: "IN PROGRESS",
           target: "0",
           limit: "0",
           reviewer: "Assign reviewer",
@@ -86,8 +86,14 @@ export default function Page() {
         return
       }
 
-      toast.success("Task created successfully!", {
-        description: `Task "${taskName}" has been added to the system.`
+      // Show success message with task details
+      toast.success("Task created successfully! 🎉", {
+        description: `#${data.id} - "${taskName}" has been added to the system.`,
+        action: {
+          label: "View Tasks",
+          onClick: () => window.location.href = '/list-task'
+        },
+        duration: 5000
       })
 
       // Reset form

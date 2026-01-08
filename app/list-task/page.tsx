@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import {
@@ -16,7 +16,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { TaskTable } from "@/components/task-table"
+import { TaskTableHierarchical } from "@/components/task-table-hierarchical"
 import { Task } from "@/lib/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
@@ -24,6 +24,7 @@ import { toast } from "sonner"
 export default function Page() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const taskTableKey = useRef(0)
 
   const fetchTasks = async () => {
     try {
@@ -73,9 +74,9 @@ export default function Page() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>All Tasks</CardTitle>
+                  <CardTitle>Task Hierarchy</CardTitle>
                   <CardDescription>
-                    View and manage all tasks in the system. You can filter, sort, and export tasks.
+                    View and manage tasks in hierarchical structure. Edit task names, change parents, and toggle status with automatic propagation.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -85,12 +86,10 @@ export default function Page() {
                       <Skeleton className="h-[400px] w-full" />
                     </div>
                   ) : (
-                    <TaskTable 
-                      tasks={tasks} 
-                      onTaskDeleted={() => {
-                        toast.success('Task deleted successfully')
-                        fetchTasks()
-                      }}
+                    <TaskTableHierarchical 
+                      key={taskTableKey.current}
+                      tasks={tasks}
+                      onTasksChanged={fetchTasks}
                     />
                   )}
                 </CardContent>
