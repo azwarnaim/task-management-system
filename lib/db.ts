@@ -84,4 +84,20 @@ export const taskDB = {
       return taskDB.hasChildren(id);
     }
   },
+
+  async getPaginatedRootTasks(page: number, limit: number): Promise<{
+    tasks: Task[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    if (isProduction) {
+      const { taskDB } = await import('./db-vercel');
+      return taskDB.getPaginatedRootTasks(page, limit);
+    } else {
+      const { taskDB } = await import('./db-sqlite');
+      return taskDB.getPaginatedRootTasks(page, limit);
+    }
+  },
 };

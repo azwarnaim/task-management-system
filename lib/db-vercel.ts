@@ -160,4 +160,73 @@ export const taskDB = {
       return rows as Task[];
     }
   },
+
+  async getPaginatedRootTasks(page: number, limit: number): Promise<{
+    tasks: Task[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const { sql } = await import('@vercel/postgres');
+    
+    // Get total count of root tasks
+    const countResult = await sql`
+      SELECT COUNT(*) as count
+      FROM tasks
+      WHERE parent_id IS NULL
+    `;
+    const total = parseInt(countResult.rows[0].count);
+    const totalPages = Math.ceil(total / limit);
+
+    // Get paginated root task IDs
+    const offset = (page - 1) * limit;
+    const rootTasksResult = await sql`
+      SELECT id
+      FROM tasks
+      WHERE parent_id IS NULL
+      ORDER BY id ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+
+    if (rootTasksResult.rows.length === 0) {
+      return { tasks: [], total, page, limit, totalPages };
+    }
+
+    const rootTaskIds = rootTasksResult.rows.map(r => r.id);
+
+    // Get all descendants recursively using CTE
+    const tasksResult = await sql`
+      WITH RECURSIVE task_tree AS (
+        SELECT id, header, type, status, target, limit_value, reviewer, parent_id
+        FROM tasks
+        WHERE id = ANY(${rootTaskIds})
+        
+        UNION ALL
+        
+        SELECT t.id, t.header, t.type, t.status, t.target, t.limit_value, t.reviewer, t.parent_id
+        FROM tasks t
+        INNER JOIN task_tree tt ON t.parent_id = tt.id
+      )
+      SELECT 
+        id,
+        header,
+        type,
+        status,
+        target,
+        limit_value as "limit",
+        reviewer,
+        parent_id as "parentId"
+      FROM task_tree
+      ORDER BY id ASC
+    `;
+
+    return { 
+      tasks: tasksResult.rows as Task[], 
+      total, 
+      page, 
+      limit, 
+      totalPages 
+    };
+  },
 };

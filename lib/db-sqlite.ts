@@ -183,6 +183,68 @@ export const taskDB = {
     return result.count > 0;
   },
 
+  getPaginatedRootTasks(page: number, limit: number): {
+    tasks: Task[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  } {
+    // Get total count of root tasks
+    const countStmt = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM tasks
+      WHERE parent_id IS NULL
+    `);
+    const { count: total } = countStmt.get() as { count: number };
+    const totalPages = Math.ceil(total / limit);
+
+    // Get paginated root task IDs
+    const offset = (page - 1) * limit;
+    const rootTasksStmt = db.prepare(`
+      SELECT id
+      FROM tasks
+      WHERE parent_id IS NULL
+      ORDER BY id ASC
+      LIMIT ? OFFSET ?
+    `);
+    const rootTaskIds = rootTasksStmt.all(limit, offset) as { id: number }[];
+
+    if (rootTaskIds.length === 0) {
+      return { tasks: [], total, page, limit, totalPages };
+    }
+
+    // Get all descendants recursively using CTE
+    const ids = rootTaskIds.map(r => r.id).join(',');
+    const tasksStmt = db.prepare(`
+      WITH RECURSIVE task_tree AS (
+        SELECT id, header, type, status, target, limit_value, reviewer, parent_id
+        FROM tasks
+        WHERE id IN (${ids})
+        
+        UNION ALL
+        
+        SELECT t.id, t.header, t.type, t.status, t.target, t.limit_value, t.reviewer, t.parent_id
+        FROM tasks t
+        INNER JOIN task_tree tt ON t.parent_id = tt.id
+      )
+      SELECT 
+        id,
+        header,
+        type,
+        status,
+        target,
+        limit_value as "limit",
+        reviewer,
+        parent_id as parentId
+      FROM task_tree
+      ORDER BY id ASC
+    `);
+    const tasks = tasksStmt.all() as Task[];
+
+    return { tasks, total, page, limit, totalPages };
+  },
+
   bulkInsertTasks(tasks: Array<Omit<Task, 'id'> & { id?: number }>): void {
     const stmt = db.prepare(`
       INSERT INTO tasks (id, header, type, status, target, limit_value, reviewer, parent_id)

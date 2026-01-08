@@ -20,19 +20,35 @@ import { TaskTableHierarchical } from "@/components/task-table-hierarchical"
 import { Task } from "@/lib/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { ChevronLeft, ChevronRight } from "lucide-react"
+
+const ITEMS_PER_PAGE = 20
 
 export default function Page() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRootTasks, setTotalRootTasks] = useState(0)
   const taskTableKey = useRef(0)
 
   const fetchTasks = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/tasks')
+      const response = await fetch(`/api/tasks?page=${currentPage}&limit=${ITEMS_PER_PAGE}`)
       if (!response.ok) throw new Error('Failed to fetch tasks')
       const data = await response.json()
-      setTasks(data)
+      
+      // Handle paginated response
+      if (data.tasks) {
+        setTasks(data.tasks)
+        setTotalPages(data.totalPages)
+        setTotalRootTasks(data.total)
+      } else {
+        // Fallback for non-paginated response
+        setTasks(data)
+      }
     } catch (error) {
       console.error('Error fetching tasks:', error)
       toast.error('Failed to load tasks')
@@ -43,7 +59,14 @@ export default function Page() {
 
   useEffect(() => {
     fetchTasks()
-  }, [])
+  }, [currentPage])
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
 
   return (
     <SidebarProvider
@@ -77,6 +100,11 @@ export default function Page() {
                   <CardTitle>Task Hierarchy</CardTitle>
                   <CardDescription>
                     View and manage tasks in hierarchical structure. Edit task names, change parents, and toggle status with automatic propagation.
+                    {totalRootTasks > 0 && (
+                      <span className="block mt-1">
+                        Showing page {currentPage} of {totalPages} ({totalRootTasks} root tasks total)
+                      </span>
+                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -86,11 +114,41 @@ export default function Page() {
                       <Skeleton className="h-[400px] w-full" />
                     </div>
                   ) : (
-                    <TaskTableHierarchical 
-                      key={taskTableKey.current}
-                      tasks={tasks}
-                      onTasksChanged={fetchTasks}
-                    />
+                    <>
+                      <TaskTableHierarchical 
+                        key={taskTableKey.current}
+                        tasks={tasks}
+                        onTasksChanged={fetchTasks}
+                      />
+                      
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                          <div className="text-sm text-muted-foreground">
+                            Page {currentPage} of {totalPages}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePageChange(currentPage - 1)}
+                              disabled={currentPage === 1}
+                            >
+                              <ChevronLeft className="h-4 w-4 mr-1" />
+                              Previous
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePageChange(currentPage + 1)}
+                              disabled={currentPage === totalPages}
+                            >
+                              Next
+                              <ChevronRight className="h-4 w-4 ml-1" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
